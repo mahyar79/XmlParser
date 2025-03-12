@@ -1,36 +1,45 @@
-﻿using System.Numerics;
-using System.Windows.Shapes;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Numerics;
 
 class Program
 {
     static void Main(string[] args)
     {
-        string svgFilePath = "E:\\Downloads\\Test.svg"; 
+        string svgFilePath = "E:\\Downloads\\Test.svg";
         SvgParser parser = new SvgParser(svgFilePath);
 
         if (parser.LoadSvg())
         {
-            List<Shape> shapes = parser.ParseShapes();
+            List<ShapeInfo> shapes = parser.ParseShapes();
             shapes = parser.ConvertToMillimeters(shapes);
 
-            foreach (Shape shape in shapes)
+            // Validate shape sizes
+            parser.CheckShapeSizes(shapes, 1000f);
+
+            // Output shapes to console (limited for brevity)
+            foreach (ShapeInfo shape in shapes.Take(10)) // Limit to first 10 shapes to avoid console overflow
             {
                 Console.WriteLine($"[RESULT] Shape ID: {shape.Id}, Type: {(shape.IsPolygon ? "Polygon" : "Path")}");
                 foreach (Vector2 vertex in shape.Vertices)
+                {
                     Console.WriteLine($"  ({vertex.X:F2}, {vertex.Y:F2}) mm");
+                }
             }
 
+            // Save all shapes to file
             SaveShapesToFile(shapes, "output_shapes.txt");
-
         }
+    }
 
-
-
-        static void SaveShapesToFile(List<Shape> shapes, string filePath)
+    static void SaveShapesToFile(List<ShapeInfo> shapes, string filePath)
+    {
+        try
         {
-            using (StreamWriter writer = new StreamWriter(filePath))
+            using (StreamWriter writer = new StreamWriter(filePath, false, new System.Text.UTF8Encoding(false), 65536)) // Large buffer
             {
-                foreach (Shape shape in shapes)
+                foreach (ShapeInfo shape in shapes)
                 {
                     writer.WriteLine($"Shape ID: {shape.Id}, Class: {shape.Class}, IsPolygon: {shape.IsPolygon}");
                     writer.WriteLine("Vertices (in mm):");
@@ -42,6 +51,10 @@ class Program
                 }
             }
             Console.WriteLine($"Shapes saved to {filePath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Error] Failed to save shapes to file: {ex.Message}");
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using SharpVectors.Dom.Svg;
 using SharpVectors.Renderers.Wpf;
@@ -26,7 +27,6 @@ public class SvgParser
 
         try
         {
-            // Create an SVG window to enable parsing
             WpfSvgWindow svgWindow = new WpfSvgWindow(800, 600, null);
             _svgDocument = new SvgDocument(svgWindow);
             _svgDocument.Load(_svgFilePath);
@@ -40,9 +40,9 @@ public class SvgParser
         }
     }
 
-    public List<Shape> ParseShapes()
+    public List<ShapeInfo> ParseShapes()
     {
-        List<Shape> shapes = new List<Shape>();
+        List<ShapeInfo> shapes = new List<ShapeInfo>();
 
         if (_svgDocument == null)
         {
@@ -50,14 +50,17 @@ public class SvgParser
             return shapes;
         }
 
+        // Track used IDs to avoid duplicates
+        HashSet<int> usedIds = new HashSet<int>();
+
         // Extract polygons
         foreach (var element in _svgDocument.GetElementsByTagName("polygon"))
         {
             if (element is SvgPolygonElement polygonElement)
             {
-                Shape shape = new Shape
+                ShapeInfo shape = new ShapeInfo
                 {
-                    Id = polygonElement.Id ?? "Unknown",
+                    Id = GenerateUniqueId(polygonElement.Id, usedIds),
                     Class = polygonElement.GetAttribute("class"),
                     IsPolygon = true
                 };
@@ -65,12 +68,20 @@ public class SvgParser
                 // Convert ISvgPointList to List<Vector2>
                 for (uint i = 0; i < polygonElement.Points.NumberOfItems; i++)
                 {
-                    var point = (polygonElement.Points.GetItem(i));
+                    var point = polygonElement.Points.GetItem(i);
                     shape.Vertices.Add(new Vector2((float)point.X, (float)point.Y));
                 }
 
-                Console.WriteLine($"[INFO] Polygon parsed: {shape.Id} with {shape.Vertices.Count} vertices.");
-                shapes.Add(shape);
+                // Validate shape (minimum 4 vertices, distinct points)
+                if (shape.Vertices.Count >= 4 && HasDistinctVertices(shape, 0.1f))
+                {
+                    Console.WriteLine($"[INFO] Polygon parsed: {shape.Id} with {shape.Vertices.Count} vertices.");
+                    shapes.Add(shape);
+                }
+                else
+                {
+                    Console.WriteLine($"[Warning] Skipping degenerate polygon {shape.Id} with {shape.Vertices.Count} vertices.");
+                }
             }
         }
 
@@ -79,43 +90,95 @@ public class SvgParser
         {
             if (element is SvgPathElement pathElement && pathElement.PathSegList.NumberOfItems > 0)
             {
-                Shape shape = new Shape
+                ShapeInfo shape = new ShapeInfo
                 {
-                    Id = pathElement.Id ?? "Unknown",
+                    Id = GenerateUniqueId(pathElement.Id, usedIds),
                     Class = pathElement.GetAttribute("class"),
                     IsPolygon = false
                 };
 
                 ParsePathData(pathElement, shape);
 
-                Console.WriteLine($"[INFO] Path parsed: {shape.Id} with {shape.Vertices.Count} points.");
-                shapes.Add(shape);
+                if (shape.Vertices.Count > 1) // Ensure path has enough points
+                {
+                    Console.WriteLine($"[INFO] Path parsed: {shape.Id} with {shape.Vertices.Count} points.");
+                    shapes.Add(shape);
+                }
+                else
+                {
+                    Console.WriteLine($"[Warning] Skipping path {shape.Id} with insufficient points ({shape.Vertices.Count}).");
+                }
             }
         }
+
+        // Deduplicate shapes
+        shapes = DeduplicateShapes(shapes);
 
         return shapes;
     }
 
-    private void ParsePathData(SvgPathElement path, Shape shape)
+    private int GenerateUniqueId(string elementId, HashSet<int> usedIds)
+    {
+        if (int.TryParse(elementId, out int parsedId) && !usedIds.Contains(parsedId))
+        {
+            usedIds.Add(parsedId);
+            return parsedId;
+        }
+
+        // Generate a unique ID
+        int newId;
+        do
+        {
+            //newId = (int)(HashCode.Combine(elementId, DateTime.Now.Ticks) % 4000);
+            newId = Math.Abs(HashCode.Combine(elementId, DateTime.Now.Ticks) % 4000);
+
+        } while (usedIds.Contains(newId));
+        usedIds.Add(newId);
+        return newId;
+    }
+
+    private bool HasDistinctVertices(ShapeInfo shape, float minDistance)
+    {
+        for (int i = 0; i < shape.Vertices.Count - 1; i++)
+        {
+            for (int j = i + 1; j < shape.Vertices.Count; j++)
+            {
+                if (Vector2.Distance(shape.Vertices[i], shape.Vertices[j]) < minDistance)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private List<ShapeInfo> DeduplicateShapes(List<ShapeInfo> shapes)
+    {
+        return shapes
+            .GroupBy(s => new { s.Id, s.Class, s.IsPolygon, Vertices = string.Join(",", s.Vertices) })
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    private void ParsePathData(SvgPathElement path, ShapeInfo shape)
     {
         try
         {
-            // Correct usage: SvgPathParser requires an ISvgPathHandler
             PathHandler handler = new PathHandler(shape);
             SvgPathParser parser = new SvgPathParser(handler);
-            parser.Parse(path.ToString());
-
-            // Shape data is now in the handler
+            parser.Parse(path.GetAttribute("d")); // Use the 'd' attribute directly
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Warning] Error parsing path {shape.Id}: {ex.Message}");
+            shape.Vertices.Clear(); // Clear any partial data
         }
     }
 
-    public List<Shape> ConvertToMillimeters(List<Shape> shapes)
+    public List<ShapeInfo> ConvertToMillimeters(List<ShapeInfo> shapes)
     {
-        foreach (Shape shape in shapes)
+        // Convert to millimeters
+        foreach (ShapeInfo shape in shapes)
         {
             for (int i = 0; i < shape.Vertices.Count; i++)
             {
@@ -125,6 +188,55 @@ public class SvgParser
                 );
             }
         }
+
+        // Normalize to positive coordinates
+        if (shapes.Any())
+        {
+            float minX = shapes.Min(s => s.Vertices.Any() ? s.Vertices.Min(v => v.X) : float.MaxValue);
+            float minY = shapes.Min(s => s.Vertices.Any() ? s.Vertices.Min(v => v.Y) : float.MaxValue);
+
+            foreach (ShapeInfo shape in shapes)
+            {
+                for (int i = 0; i < shape.Vertices.Count; i++)
+                {
+                    shape.Vertices[i] = new Vector2(
+                        shape.Vertices[i].X - minX,
+                        shape.Vertices[i].Y - minY
+                    );
+                }
+            }
+        }
+
         return shapes;
+    }
+
+    public void CheckShapeSizes(List<ShapeInfo> shapes, float maxWidth = 1000f)
+    {
+        foreach (ShapeInfo shape in shapes)
+        {
+            if (!shape.Vertices.Any()) continue;
+
+            float minX = shape.Vertices.Min(v => v.X);
+            float maxX = shape.Vertices.Max(v => v.X);
+            float width = maxX - minX;
+
+            float minY = shape.Vertices.Min(v => v.Y);
+            float maxY = shape.Vertices.Max(v => v.Y);
+            float height = maxY - minY;
+
+            // Update BoundingBox for potential use in nesting
+            shape.BoundingBox = new BoundingBox
+            {
+                X = minX,
+                Y = minY,
+                Width = width,
+                Height = height
+            };
+
+            if (width > maxWidth)
+            {
+                Console.WriteLine($"[Warning] Shape {shape.Id} exceeds width limit: {width:F2} mm (height: {height:F2} mm)");
+            }
+        }
     }
 }
