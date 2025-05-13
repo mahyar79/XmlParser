@@ -7,13 +7,13 @@ class Program
 {
     static void Main(string[] args)
     {
-        string svgFilePath = "E:\\Downloads\\Test.svg";
+        string svgFilePath = "E:\\Downloads\\Nesting files\\sample.svg";
         SvgParser parser = new SvgParser(svgFilePath);
 
         if (parser.LoadSvg())
         {
             List<ShapeInfo> shapes = parser.ParseShapes();
-            shapes = parser.ConvertToMillimeters(shapes);
+            
 
             // Validate shape sizes
             parser.CheckShapeSizes(shapes, 1000f);
@@ -24,7 +24,7 @@ class Program
                 Console.WriteLine($"[RESULT] Shape ID: {shape.Id}, Type: {(shape.IsPolygon ? "Polygon" : "Path")}");
                 foreach (Vector2 vertex in shape.Vertices)
                 {
-                    Console.WriteLine($"  ({vertex.X:F2}, {vertex.Y:F2}) mm");
+                    Console.WriteLine($"  ({vertex.X:F5}, {vertex.Y:F5}) ");
                 }
             }
 
@@ -42,11 +42,15 @@ class Program
                 foreach (ShapeInfo shape in shapes)
                 {
                     writer.WriteLine($"Shape ID: {shape.Id}, Class: {shape.Class}, IsPolygon: {shape.IsPolygon}");
-                    writer.WriteLine("Vertices (in mm):");
-                    foreach (Vector2 vertex in shape.Vertices)
-                    {
-                        writer.WriteLine($"  ({vertex.X:F2}, {vertex.Y:F2})");
-                    }
+                    writer.Write("Vertices:");
+                    //foreach (Vector2 vertex in shape.Vertices)
+                    //{
+                    //    writer.WriteLine($"  ({vertex.X:F2}, {vertex.Y:F2})");
+                    //}
+                    //writer.WriteLine();
+
+                    string verticesLine = string.Join(";", shape.Vertices.Select(v => $"{v.X:F5},{v.Y:F5}"));
+                    writer.WriteLine(verticesLine);
                     writer.WriteLine();
                 }
             }

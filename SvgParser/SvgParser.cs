@@ -175,40 +175,7 @@ public class SvgParser
         }
     }
 
-    public List<ShapeInfo> ConvertToMillimeters(List<ShapeInfo> shapes)
-    {
-        // Convert to millimeters
-        foreach (ShapeInfo shape in shapes)
-        {
-            for (int i = 0; i < shape.Vertices.Count; i++)
-            {
-                shape.Vertices[i] = new Vector2(
-                    shape.Vertices[i].X * 0.3528f,
-                    shape.Vertices[i].Y * 0.3528f
-                );
-            }
-        }
-
-        // Normalize to positive coordinates
-        if (shapes.Any())
-        {
-            float minX = shapes.Min(s => s.Vertices.Any() ? s.Vertices.Min(v => v.X) : float.MaxValue);
-            float minY = shapes.Min(s => s.Vertices.Any() ? s.Vertices.Min(v => v.Y) : float.MaxValue);
-
-            foreach (ShapeInfo shape in shapes)
-            {
-                for (int i = 0; i < shape.Vertices.Count; i++)
-                {
-                    shape.Vertices[i] = new Vector2(
-                        shape.Vertices[i].X - minX,
-                        shape.Vertices[i].Y - minY
-                    );
-                }
-            }
-        }
-
-        return shapes;
-    }
+    
 
     public void CheckShapeSizes(List<ShapeInfo> shapes, float maxWidth = 1000f)
     {
