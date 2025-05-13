@@ -7,19 +7,23 @@ class Program
 {
     static void Main(string[] args)
     {
-        string svgFilePath = "E:\\Downloads\\Nesting files\\sample.svg";
+        string svgFilePath = "E:\\Downloads\\Nesting files\\sammple.svg";
         SvgParser parser = new SvgParser(svgFilePath);
 
         if (parser.LoadSvg())
         {
             List<ShapeInfo> shapes = parser.ParseShapes();
-            
+           SvgParser.ScaleShapes(shapes, 0.4f);
+            //SvgParser.ShiftToPositive(shapes);
+            SvgParser.NormalizeShapes(shapes, 1000f); // Normalize to fit in [0, 1000] box
+
+
 
             // Validate shape sizes
             parser.CheckShapeSizes(shapes, 1000f);
 
-            // Output shapes to console (limited for brevity)
-            foreach (ShapeInfo shape in shapes.Take(10)) // Limit to first 10 shapes to avoid console overflow
+            
+            foreach (ShapeInfo shape in shapes.Take(0)) // Limit to first 10 shapes to avoid console overflow
             {
                 Console.WriteLine($"[RESULT] Shape ID: {shape.Id}, Type: {(shape.IsPolygon ? "Polygon" : "Path")}");
                 foreach (Vector2 vertex in shape.Vertices)
@@ -62,3 +66,4 @@ class Program
         }
     }
 }
+

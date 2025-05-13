@@ -75,7 +75,7 @@ public class SvgParser
                 // Validate shape (minimum 4 vertices, distinct points)
                 if (shape.Vertices.Count >= 4 && HasDistinctVertices(shape, 0.1f))
                 {
-                    Console.WriteLine($"[INFO] Polygon parsed: {shape.Id} with {shape.Vertices.Count} vertices.");
+                   // Console.WriteLine($"[INFO] Polygon parsed: {shape.Id} with {shape.Vertices.Count} vertices.");
                     shapes.Add(shape);
                 }
                 else
@@ -101,7 +101,7 @@ public class SvgParser
 
                 if (shape.Vertices.Count > 1) // Ensure path has enough points
                 {
-                    Console.WriteLine($"[INFO] Path parsed: {shape.Id} with {shape.Vertices.Count} points.");
+                   // Console.WriteLine($"[INFO] Path parsed: {shape.Id} with {shape.Vertices.Count} points.");
                     shapes.Add(shape);
                 }
                 else
@@ -202,8 +202,71 @@ public class SvgParser
 
             if (width > maxWidth)
             {
-                Console.WriteLine($"[Warning] Shape {shape.Id} exceeds width limit: {width:F2} mm (height: {height:F2} mm)");
+                Console.WriteLine($"[Warning] Shape {shape.Id} exceeds width limit: {width:F2}  (height: {height:F2} )");
             }
         }
     }
+
+    public  static void ScaleShapes(List<ShapeInfo> shapes, float scaleFactor)
+    {
+        foreach (var shape in shapes)
+        {
+            if (shape.Vertices.Count == 0) continue;
+
+            float centerX = shape.Vertices.Average(v => v.X);
+            float centerY = shape.Vertices.Average(v => v.Y);
+            Vector2 centroid = new Vector2(centerX, centerY);
+
+
+
+            for (int i = 0; i < shape.Vertices.Count; i++)
+            {
+                Vector2 offset = shape.Vertices[i] - centroid;
+                shape.Vertices[i] = centroid + offset * scaleFactor;
+            }
+
+        }
+    }
+
+    //public static void ShiftToPositive(List<ShapeInfo> shapes)
+    //{
+    //    float minX = shapes.SelectMany(s => s.Vertices).Min(v => v.X);
+    //    float minY = shapes.SelectMany(s => s.Vertices).Min(v => v.Y);
+    //    Vector2 shift = new Vector2(-minX, -minY);
+
+    //    foreach (var shape in shapes)
+    //    {
+    //        for (int i = 0; i < shape.Vertices.Count; i++)
+    //        {
+    //            shape.Vertices[i] += shift;
+    //        }
+    //    }
+    //}
+
+    public static void NormalizeShapes(List<ShapeInfo> shapes, float targetSize = 1000f)
+    {
+        if (shapes.Count == 0) return;
+
+        var allPoints = shapes.SelectMany(s => s.Vertices).ToList();
+
+        float minX = allPoints.Min(p => p.X);
+        float maxX = allPoints.Max(p => p.X);
+        float minY = allPoints.Min(p => p.Y);
+        float maxY = allPoints.Max(p => p.Y);
+
+        float rangeX = maxX - minX;
+        float rangeY = maxY - minY;
+
+        foreach (var shape in shapes)
+        {
+            for (int i = 0; i < shape.Vertices.Count; i++)
+            {
+                float normX = (shape.Vertices[i].X - minX) / rangeX * targetSize;
+                float normY = (shape.Vertices[i].Y - minY) / rangeY * targetSize;
+
+                shape.Vertices[i] = new Vector2(normX, normY);
+            }
+        }
+    }
+
 }
