@@ -7,18 +7,15 @@ class Program
 {
     static void Main(string[] args)
     {
-        string svgFilePath = "E:\\Downloads\\Nesting files\\sammple.svg";
+        string svgFilePath = "E:\\Downloads\\Nesting files\\adobe2.svg";
         SvgParser parser = new SvgParser(svgFilePath);
 
         if (parser.LoadSvg())
         {
             List<ShapeInfo> shapes = parser.ParseShapes();
-           SvgParser.ScaleShapes(shapes, 0.4f);
-            //SvgParser.ShiftToPositive(shapes);
-            SvgParser.NormalizeShapes(shapes, 1000f); // Normalize to fit in [0, 1000] box
-
-
-
+           SvgParser.ScaleShapes(shapes, 0.3f);
+            
+           
             // Validate shape sizes
             parser.CheckShapeSizes(shapes, 1000f);
 
@@ -46,7 +43,7 @@ class Program
                 foreach (ShapeInfo shape in shapes)
                 {
                     writer.WriteLine($"Shape ID: {shape.Id}, Class: {shape.Class}, IsPolygon: {shape.IsPolygon}");
-                    writer.Write("Vertices:");
+                    writer.Write("Vertices :");
                     //foreach (Vector2 vertex in shape.Vertices)
                     //{
                     //    writer.WriteLine($"  ({vertex.X:F2}, {vertex.Y:F2})");
